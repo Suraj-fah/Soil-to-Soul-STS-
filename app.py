@@ -1,3 +1,5 @@
+import csv
+import io
 import math
 import os
 import sqlite3
@@ -455,6 +457,39 @@ def admin_users():
     with db() as conn:
         rows = conn.execute("SELECT id,name,email,role,created_at FROM users ORDER BY created_at DESC, id DESC").fetchall()
     return jsonify([dict(row) for row in rows])
+
+
+
+@app.get("/api/admin/export/<dataset>")
+@require_roles("admin")
+def admin_export(dataset):
+    """Download an administrator-only CSV snapshot."""
+    exports = {
+        "products": (["id","farmer","name","category","price","stock","unit","area","created_at"],
+                     "SELECT id,farmer,name,category,price,stock,unit,area,created_at FROM products ORDER BY id"),
+        "orders": (["id","buyer","product_id","product_name","quantity","delivery_area","delivery_window","status","created_at"],
+                   "SELECT o.id,o.buyer,o.product_id,p.name,o.quantity,o.delivery_area,o.delivery_window,o.status,o.created_at FROM orders o JOIN products p ON p.id=o.product_id ORDER BY o.id"),
+        "users": (["id","name","email","role","created_at"],
+                  "SELECT id,name,email,role,created_at FROM users ORDER BY id")
+    }
+    if dataset not in exports:
+        return jsonify(error="Choose products, orders or users for export."), 404
+    headers, sql = exports[dataset]
+    output = io.StringIO(newline="")
+    writer = csv.writer(output)
+    writer.writerow(headers)
+    with db() as conn:
+        for row in conn.execute(sql).fetchall():
+            values = [row[key] if isinstance(row, dict) else row[index] for index, key in enumerate(headers)]
+            safe = []
+            for value in values:
+                cell = "" if value is None else str(value)
+                if cell.startswith(("=", "+", "-", "@", "\t", "\r")):
+                    cell = "'" + cell
+                safe.append(cell)
+            writer.writerow(safe)
+    return app.response_class(output.getvalue(), mimetype="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="farmroute-{dataset}.csv"', "Cache-Control": "no-store"})
 
 
 @app.post("/api/demo-payment")
