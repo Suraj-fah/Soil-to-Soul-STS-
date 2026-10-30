@@ -1,16 +1,20 @@
 # FarmRoute Direct
 
-A professional, multilingual-ready farm-to-city marketplace and delivery coordination MVP.
+FarmRoute Direct is a professional farm-to-city marketplace and delivery-coordination hackathon MVP. It demonstrates how farmers can list produce, buyers can place orders, and operations users can group open orders by delivery area and preferred time window.
 
-## What this MVP includes
-- Farmer and buyer demo workspaces
-- Product catalogue and inventory management
-- Order creation and status updates
-- Delivery batch grouping by area and delivery window
-- Illustrative grouped-delivery cost comparison
-- English and Telugu interface labels
-- SQLite persistence for local development
-- Flask JSON API and responsive web interface
+## Implemented in this repository
+
+- Responsive dashboard with a restrained, professional agricultural visual style
+- Product marketplace seeded with clearly labelled fictional demo products
+- Add-product form with price and stock validation
+- Buyer order placement with stock checks
+- Persistent product and order records
+- Order status updates: Placed, Confirmed, Packed, Out for delivery, Delivered and Cancelled
+- Delivery batches grouped by area and delivery window
+- Dashboard metrics for products, active orders, batches and listed stock value
+- Flask JSON API
+- SQLite for local development; PostgreSQL support through DATABASE_URL
+- English interface; Telugu language selection is shown as planned, but translation is not implemented yet
 
 ## Run locally
 
@@ -24,20 +28,40 @@ python app.py
 
 Open http://127.0.0.1:5000.
 
-The app seeds clearly labelled demonstration data on first run. Use the demo role switcher to explore farmer, buyer and operations views. This is a hackathon MVP, not a production marketplace: payments, live GPS, verified identity, real route optimisation and production-grade authentication are not included.
+The database is created automatically and seeded with fictional demonstration products on first run.
 
-## Deployment
+## API endpoints
 
-A Render blueprint is provided in `render.yaml`. Set `SECRET_KEY` to a long random value. For persistent hosted data, configure a PostgreSQL database and `DATABASE_URL`; without it, SQLite is suitable only for local/demo use and may not persist on ephemeral hosting filesystems.
+- `GET /api/health` – application and database health
+- `GET /api/products` – list products
+- `POST /api/products` – create a product
+- `GET /api/orders` – list orders
+- `POST /api/orders` – place an order and reduce available stock
+- `PATCH /api/orders/<id>` – update order status
+- `GET /api/delivery-batches` – group open orders by area and delivery window
+
+## Deploy to Render
+
+A starter blueprint is included in `render.yaml`.
+
+1. Push this repository to GitHub.
+2. In Render, create a new Blueprint deployment and select this repository.
+3. Add a managed PostgreSQL database in Render and set the web service's `DATABASE_URL` to its internal connection string.
+4. Ensure `SECRET_KEY` is set to a long random value.
+5. Deploy, then verify the public site's `/api/health` endpoint.
+
+SQLite is intended for local development only on hosts with ephemeral filesystems. Use PostgreSQL for persistent hosted data.
+
+## Honest scope and limitations
+
+This is a hackathon MVP, not a production-ready marketplace. It currently has no real account authentication, role permissions, payment processing, live GPS, road-network route optimisation, SMS notifications or fully translated Telugu interface. The current order workflow uses a simple browser prompt for buyer details. Delivery batches are grouped by matching area and delivery window; they are not calculated driving routes.
+
+All seeded farms, names, products and orders are fictional examples. Listed-stock value is an arithmetic dashboard metric, not revenue. Do not claim verified transport savings or real farmer adoption from this demonstration.
 
 ## Project structure
 
-- `app.py` – Flask application, API, SQLite/PostgreSQL data access and seed data
+- `app.py` – Flask application, API, database access and seed data
 - `templates/index.html` – application shell
-- `static/css/styles.css` – visual system and responsive layouts
+- `static/css/styles.css` – responsive visual system
 - `static/js/app.js` – frontend interactions and API integration
 - `render.yaml` – deployment blueprint
-
-## Responsible demo notes
-
-All seeded names, farms, products and orders are fictional examples. Delivery cost figures are assumptions for demonstrating the calculation, not verified savings. Grouping is area/time-window based and is not road-network route optimisation. Translation strings should be reviewed by fluent speakers before real-world use.
