@@ -6,7 +6,7 @@ FarmRoute Direct is a professional farm-to-city marketplace and delivery-coordin
 
 - Responsive dashboard with a restrained, professional agricultural visual style
 - Product marketplace seeded with clearly labelled fictional demo products
-- Add-product form with price and stock validation
+- Add-product form with price and stock validation\n- Edit and remove product listings; products with order history are protected to preserve records
 - Buyer order placement with stock checks
 - Persistent product and order records
 - Order status updates: Placed, Confirmed, Packed, Out for delivery, Delivered and Cancelled
@@ -37,11 +37,11 @@ The database is created automatically and seeded with fictional demonstration pr
 
 - `GET /api/health` – application and database health
 - `GET /api/products` – list products
-- `POST /api/products` – create a product
+- `POST /api/products` – create a product\n- `PATCH /api/products/<id>` – edit a product\n- `DELETE /api/products/<id>` – remove a product only when it has no order history
 - `GET /api/orders` – list orders
 - `POST /api/orders` – place an order and reduce available stock
 - `PATCH /api/orders/<id>` – update order status
-- `GET /api/delivery-batches` – group open orders by area and delivery window
+- `GET /api/delivery-batches` – group open orders by area and delivery window\n- `GET /api/admin/summary` – dashboard summary metrics\n- `POST /api/demo-payment` – simulated checkout only; no money is collected
 
 ## Run tests\n\n```bash\npip install pytest\npytest -q\n```\n\nThe tests use temporary SQLite databases and do not modify your local demo database.\n\n## Deploy to Render
 
@@ -57,7 +57,7 @@ SQLite is intended for local development only on hosts with ephemeral filesystem
 
 ## Honest scope and limitations
 
-This is a hackathon MVP, not a production-ready marketplace. It currently has no real account authentication, role permissions, payment processing, live GPS, road-network route optimisation, SMS notifications or fully translated Telugu interface. The MVP does not yet support editing or deleting product listings, refunds, or multi-farmer settlement. The buyer order workflow uses an inline form for buyer, quantity, delivery area and preferred delivery window. Delivery batches are grouped by matching area and delivery window; they are not calculated driving routes.
+This is a hackathon MVP, not a production-ready marketplace. It currently has no real account authentication, role permissions, payment processing, live GPS, road-network route optimisation, SMS notifications or fully translated Telugu interface. Product listings can be edited. A listing can be removed only when no orders reference it; otherwise set its available quantity to zero to stop new orders. Refunds and multi-farmer settlement are not implemented. The buyer order workflow uses an inline form for buyer, quantity, delivery area and preferred delivery window. Delivery batches are grouped by matching area and delivery window; they are not calculated driving routes.
 
 All seeded farms, names, products and orders are fictional examples. Listed-stock value is an arithmetic dashboard metric, not revenue. Do not claim verified transport savings or real farmer adoption from this demonstration.
 
