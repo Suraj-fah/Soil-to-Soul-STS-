@@ -112,3 +112,20 @@ def test_demo_payment_is_explicitly_simulated(client):
     assert response.status_code == 200
     assert response.json["status"] == "Demo payment successful"
     assert "No money was collected" in response.json["note"]
+
+
+
+def test_product_with_order_history_cannot_be_deleted(client):
+    product = client.get("/api/products").json[0]
+    created = client.post("/api/orders", json={
+        "product_id": product["id"], "quantity": 2,
+        "buyer": "History Shop", "delivery_area": "Area",
+        "delivery_window": "Morning"
+    })
+    assert created.status_code == 201
+    order_id = created.json["id"]
+    cancelled = client.patch(f"/api/orders/{order_id}", json={"status": "Cancelled"})
+    assert cancelled.status_code == 200
+    response = client.delete(f"/api/products/{product['id']}")
+    assert response.status_code == 409
+    assert "order history" in response.json["error"]
