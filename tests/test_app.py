@@ -289,3 +289,21 @@ def test_production_role_boundaries_and_order_privacy(client):
     })
     assert client.patch(f"/api/orders/{order_id}", json={"status": "Confirmed"}).status_code == 200
     farmroute.app.config.update(TESTING=True)
+
+
+def test_presentation_role_login_is_disabled_by_default(client, monkeypatch):
+    monkeypatch.delenv("PRESENTATION_MODE", raising=False)
+    assert client.post("/api/auth/presentation", json={"role": "farmer"}).status_code == 404
+
+
+def test_presentation_role_login_without_credentials(client, monkeypatch):
+    monkeypatch.setenv("PRESENTATION_MODE", "true")
+    farmer = client.post("/api/auth/presentation", json={"role": "farmer"})
+    assert farmer.status_code == 200
+    assert farmer.json["user"]["role"] == "farmer"
+    assert client.get("/api/auth/me").json["user"]["role"] == "farmer"
+    client.post("/api/auth/logout")
+    buyer = client.post("/api/auth/presentation", json={"role": "buyer"})
+    assert buyer.status_code == 200
+    assert buyer.json["user"]["role"] == "buyer"
+    assert client.post("/api/auth/presentation", json={"role": "superuser"}).status_code == 400
