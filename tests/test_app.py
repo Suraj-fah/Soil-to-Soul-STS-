@@ -92,3 +92,23 @@ def test_home_page_renders(client):
     response = client.get("/")
     assert response.status_code == 200
     assert b"FarmRoute Direct" in response.data
+
+def test_product_edit_delete_and_admin_summary(client):
+    product = client.get("/api/products").json[0]
+    edited = client.patch(f"/api/products/{product['id']}", json={"price": 31, "stock": 80})
+    assert edited.status_code == 200
+    updated = next(p for p in client.get("/api/products").json if p["id"] == product["id"])
+    assert updated["price"] == 31
+    assert updated["stock"] == 80
+    summary = client.get("/api/admin/summary")
+    assert summary.status_code == 200
+    assert summary.json["products"] >= 4
+    removed = client.delete(f"/api/products/{product['id']}")
+    assert removed.status_code == 200
+
+
+def test_demo_payment_is_explicitly_simulated(client):
+    response = client.post("/api/demo-payment", json={"amount": 250, "method": "UPI (demo)"})
+    assert response.status_code == 200
+    assert response.json["status"] == "Demo payment successful"
+    assert "No money was collected" in response.json["note"]
