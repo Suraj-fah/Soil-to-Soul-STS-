@@ -193,3 +193,32 @@ def test_role_permissions_are_enforced(client):
     assert client.get("/api/admin/summary").status_code == 403
     assert client.get("/api/orders").status_code == 200
     farmroute.app.config.update(TESTING=True)
+
+
+def test_admin_csv_exports_require_admin_and_include_headers(client, monkeypatch):
+    monkeypatch.setenv("ADMIN_INVITE_CODE", "test-admin-code")
+    admin = client.post("/api/auth/register", json={
+        "name": "Export Admin", "email": "export-admin@example.test",
+        "password": "StrongPass123", "role": "admin", "admin_code": "test-admin-code"
+    })
+    assert admin.status_code == 201
+    products = client.get("/api/admin/export/products")
+    assert products.status_code == 200
+    assert products.mimetype == "text/csv"
+    assert "attachment;" in products.headers["Content-Disposition"]
+    assert "id,farmer,name,category" in products.get_data(as_text=True)
+    assert client.get("/api/admin/export/orders").status_code == 200
+    users = client.get("/api/admin/export/users")
+    assert users.status_code == 200
+    assert "email,role" in users.get_data(as_text=True)
+    assert client.get("/api/admin/export/unknown").status_code == 404
+
+
+def test_admin_csv_exports_are_forbidden_to_non_admin(client):
+    client.post("/api/auth/register", json={
+        "name": "Regular Buyer", "email": "csv-buyer@example.test",
+        "password": "StrongPass123", "role": "buyer"
+    })
+    farmroute.app.config.update(TESTING=False)
+    assert client.get("/api/admin/export/products").status_code == 403
+    farmroute.app.config.update(TESTING=True)
