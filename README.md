@@ -53,7 +53,7 @@ A starter blueprint is included in `render.yaml`.
 4. Ensure `SECRET_KEY` is set to a long random value.
 5. Deploy, then verify the public site's `/api/health` endpoint.
 
-SQLite is intended for local development only on hosts with ephemeral filesystems. Use PostgreSQL for persistent hosted data.
+SQLite is intended for local development only on hosts with ephemeral filesystems. Use PostgreSQL for hosted data. **Important free-tier limitation:** Render's free Postgres databases expire 30 days after creation and have no backups. This setup is for a short-lived demo; export the data before expiry or upgrade to a paid database to keep it. Free web services can also spin down after inactivity.
 
 ## Honest scope and limitations
 
