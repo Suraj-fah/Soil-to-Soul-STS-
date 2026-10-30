@@ -263,6 +263,7 @@ def add_product():
 
 
 @app.get("/api/orders")
+@require_roles("farmer","buyer","admin")
 def orders():
     user = current_user()
     sql = """SELECT o.*, p.name AS product_name, p.farmer, p.unit, p.price
@@ -360,6 +361,7 @@ def update_order(order_id):
 
 
 @app.get("/api/delivery-batches")
+@require_roles("farmer","admin")
 def batches():
     with db() as conn:
         rows = conn.execute("""SELECT delivery_area, delivery_window,
