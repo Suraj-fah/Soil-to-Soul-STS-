@@ -264,11 +264,19 @@ def add_product():
 
 @app.get("/api/orders")
 def orders():
+    user = current_user()
+    sql = """SELECT o.*, p.name AS product_name, p.farmer, p.unit, p.price
+             FROM orders o JOIN products p ON p.id=o.product_id"""
+    params = ()
+    if user and user["role"] == "buyer":
+        sql += " WHERE o.buyer_user_id=?"
+        params = (user["id"],)
+    elif user and user["role"] == "farmer":
+        sql += " WHERE p.farmer_user_id=?"
+        params = (user["id"],)
+    sql += " ORDER BY o.created_at DESC, o.id DESC"
     with db() as conn:
-        rows = conn.execute("""SELECT o.*, p.name AS product_name,
-            p.farmer, p.unit, p.price FROM orders o
-            JOIN products p ON p.id=o.product_id
-            ORDER BY o.created_at DESC, o.id DESC""").fetchall()
+        rows = conn.execute(query(sql), params).fetchall()
         return jsonify([dict(row) for row in rows])
 
 
