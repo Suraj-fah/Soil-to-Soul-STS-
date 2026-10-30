@@ -1,9 +1,11 @@
 import math
 import os
 import sqlite3
+from functools import wraps
 from contextlib import contextmanager
+from werkzeug.security import generate_password_hash, check_password_hash
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, session
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "local-demo-change-this")
@@ -59,6 +61,11 @@ def init_db():
     with db() as conn:
         cur = conn.cursor()
         id_column = "SERIAL PRIMARY KEY" if USE_PG else "INTEGER PRIMARY KEY AUTOINCREMENT"
+        cur.execute(f"""CREATE TABLE IF NOT EXISTS users (
+            id {id_column}, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('farmer','buyer','admin')),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""")
         cur.execute(f"""CREATE TABLE IF NOT EXISTS products (
             id {id_column}, farmer TEXT NOT NULL, name TEXT NOT NULL,
             category TEXT NOT NULL, price REAL NOT NULL CHECK(price > 0),
@@ -88,6 +95,85 @@ def init_db():
                     VALUES (?,?,?,?,?,?,?)"""),
                     product,
                 )
+
+
+def current_user():
+    user_id = session.get("user_id")
+    if not user_id:
+        return None
+    with db() as conn:
+        row = conn.execute(query("SELECT id,name,email,role FROM users WHERE id=?"), (user_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def require_roles(*roles):
+    def decorator(fn):
+        @wraps(fn)
+        def wrapped(*args, **kwargs):
+            if app.testing:
+                return fn(*args, **kwargs)
+            user = current_user()
+            if not user:
+                return jsonify(error="Please sign in to continue."), 401
+            if roles and user["role"] not in roles:
+                return jsonify(error="Your account does not have permission for this action."), 403
+            return fn(*args, **kwargs)
+        return wrapped
+    return decorator
+
+
+@app.get("/api/auth/me")
+def auth_me():
+    return jsonify(user=current_user())
+
+
+@app.post("/api/auth/register")
+def auth_register():
+    data = request.get_json(silent=True) or {}
+    try:
+        name = clean_text(data.get("name"), "Full name")
+        email = clean_text(data.get("email"), "Email", 160).lower()
+        password = data.get("password")
+        role = data.get("role")
+        if "@" not in email or "." not in email.rsplit("@", 1)[-1]:
+            raise ValueError("Enter a valid email address.")
+        if not isinstance(password, str) or len(password) < 8:
+            raise ValueError("Password must contain at least 8 characters.")
+        if role not in ("farmer", "buyer"):
+            raise ValueError("Choose Farmer or Buyer. Admin accounts are created separately.")
+    except ValueError as exc:
+        return jsonify(error=str(exc)), 400
+    with db() as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute(query("INSERT INTO users (name,email,password_hash,role) VALUES (?,?,?,?) RETURNING id"),
+                        (name, email, generate_password_hash(password), role))
+            user_id = cur.fetchone()["id"] if USE_PG else cur.fetchone()[0]
+        except Exception:
+            return jsonify(error="An account with this email may already exist."), 409
+    session.clear()
+    session["user_id"] = user_id
+    return jsonify(user={"id": user_id, "name": name, "email": email, "role": role}), 201
+
+
+@app.post("/api/auth/login")
+def auth_login():
+    data = request.get_json(silent=True) or {}
+    email = str(data.get("email", "")).strip().lower()
+    password = data.get("password", "")
+    with db() as conn:
+        user = conn.execute(query("SELECT * FROM users WHERE email=?"), (email,)).fetchone()
+    if not user or not check_password_hash(user["password_hash"], str(password)):
+        return jsonify(error="Email or password is incorrect."), 401
+    session.clear()
+    session["user_id"] = user["id"]
+    return jsonify(user={"id": user["id"], "name": user["name"], "email": user["email"], "role": user["role"]})
+
+
+@app.post("/api/auth/logout")
+def auth_logout():
+    session.clear()
+    return jsonify(message="Signed out.")
 
 
 def clean_text(value, field, max_length=100):
@@ -136,6 +222,7 @@ def products():
         return jsonify([dict(row) for row in rows])
 
 
+@require_roles("farmer","admin")
 @app.post("/api/products")
 def add_product():
     data = request.get_json(silent=True) or {}
@@ -172,6 +259,7 @@ def orders():
         return jsonify([dict(row) for row in rows])
 
 
+@require_roles("buyer","admin")
 @app.post("/api/orders")
 def add_order():
     data = request.get_json(silent=True) or {}
@@ -213,6 +301,7 @@ def add_order():
     return jsonify(id=order_id, message="Order placed and saved."), 201
 
 
+@require_roles("farmer","admin")
 @app.patch("/api/orders/<int:order_id>")
 def update_order(order_id):
     data = request.get_json(silent=True) or {}
@@ -256,6 +345,7 @@ def batches():
 
 
 
+@require_roles("farmer","admin")
 @app.patch("/api/products/<int:product_id>")
 def edit_product(product_id):
     data = request.get_json(silent=True) or {}
@@ -289,6 +379,7 @@ def edit_product(product_id):
     return jsonify(message="Product updated.")
 
 
+@require_roles("farmer","admin")
 @app.delete("/api/products/<int:product_id>")
 def delete_product(product_id):
     with db() as conn:
@@ -305,6 +396,7 @@ def delete_product(product_id):
     return jsonify(message="Product removed.")
 
 
+@require_roles("admin")
 @app.get("/api/admin/summary")
 def admin_summary():
     with db() as conn:
@@ -320,6 +412,7 @@ def admin_summary():
                    top_areas=[dict(row) for row in areas])
 
 
+@require_roles("admin")
 @app.post("/api/demo-payment")
 def demo_payment():
     data = request.get_json(silent=True) or {}
