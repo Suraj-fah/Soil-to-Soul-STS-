@@ -152,7 +152,7 @@ def auth_register():
             raise ValueError("Enter a valid email address.")
         if not isinstance(password, str) or len(password) < 8:
             raise ValueError("Password must contain at least 8 characters.")
-        if role not in ("farmer", "buyer"):
+        if role not in ("farmer", "buyer", "admin"):
             raise ValueError("Choose Farmer, Buyer or Admin.")
         if role == "admin" and (not os.getenv("ADMIN_INVITE_CODE") or data.get("admin_code") != os.getenv("ADMIN_INVITE_CODE")):
             raise ValueError("A valid administrator invitation code is required.")
