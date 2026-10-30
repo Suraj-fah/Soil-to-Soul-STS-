@@ -293,12 +293,15 @@ def edit_product(product_id):
 def delete_product(product_id):
     with db() as conn:
         cur = conn.cursor()
-        cur.execute(query("SELECT COUNT(*) AS n FROM orders WHERE product_id=? AND status NOT IN ('Delivered','Cancelled')"), (product_id,))
-        if cur.fetchone()["n"]:
-            return jsonify(error="This product has active orders and cannot be removed."), 409
-        cur.execute(query("DELETE FROM products WHERE id=?"), (product_id,))
-        if cur.rowcount == 0:
+        cur.execute(query("SELECT COUNT(*) AS n FROM products WHERE id=?"), (product_id,))
+        if cur.fetchone()["n"] == 0:
             return jsonify(error="Product not found."), 404
+        # Keep order history referentially intact. A product with any historical
+        # order cannot be hard-deleted; farmers can set its stock to zero instead.
+        cur.execute(query("SELECT COUNT(*) AS n FROM orders WHERE product_id=?"), (product_id,))
+        if cur.fetchone()["n"]:
+            return jsonify(error="This product has order history and cannot be removed. Set available quantity to zero to stop new orders."), 409
+        cur.execute(query("DELETE FROM products WHERE id=?"), (product_id,))
     return jsonify(message="Product removed.")
 
 
