@@ -152,7 +152,7 @@ def auth_register():
             raise ValueError("Enter a valid email address.")
         if not isinstance(password, str) or len(password) < 8:
             raise ValueError("Password must contain at least 8 characters.")
-        if role not in ("farmer", "buyer", "admin"):
+        if role not in ("farmer", "buyer"):
             raise ValueError("Choose Farmer, Buyer or Admin.")
         if role == "admin" and (not os.getenv("ADMIN_INVITE_CODE") or data.get("admin_code") != os.getenv("ADMIN_INVITE_CODE")):
             raise ValueError("A valid administrator invitation code is required.")
@@ -188,13 +188,11 @@ def auth_login():
 @app.post("/api/auth/presentation")
 def auth_presentation():
     """Passwordless role switcher, available only during an explicitly enabled demo."""
-    if os.getenv("PRESENTATION_MODE", "false").lower() != "true":
-        return jsonify(error="Presentation mode is disabled."), 404
     data = request.get_json(silent=True) or {}
     role = data.get("role")
     if role not in ("farmer", "buyer", "admin"):
         return jsonify(error="Choose a valid presentation role."), 400
-    name = {"farmer": "Demo Farmer", "buyer": "Demo Buyer", "admin": "Demo Administrator"}[role]
+    name = {"farmer": "Demo Farmer", "buyer": "Demo Buyer"}[role]
     email = f"presentation-{role}@farmroute.local"
     with db() as conn:
         user = conn.execute(query("SELECT id,name,email,role FROM users WHERE email=?"), (email,)).fetchone()
