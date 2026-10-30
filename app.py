@@ -185,6 +185,31 @@ def auth_login():
     return jsonify(user={"id": user["id"], "name": user["name"], "email": user["email"], "role": user["role"]})
 
 
+@app.post("/api/auth/presentation")
+def auth_presentation():
+    """Passwordless role switcher, available only during an explicitly enabled demo."""
+    if os.getenv("PRESENTATION_MODE", "false").lower() != "true":
+        return jsonify(error="Presentation mode is disabled."), 404
+    data = request.get_json(silent=True) or {}
+    role = data.get("role")
+    if role not in ("farmer", "buyer", "admin"):
+        return jsonify(error="Choose a valid presentation role."), 400
+    name = {"farmer": "Demo Farmer", "buyer": "Demo Buyer", "admin": "Demo Administrator"}[role]
+    email = f"presentation-{role}@farmroute.local"
+    with db() as conn:
+        user = conn.execute(query("SELECT id,name,email,role FROM users WHERE email=?"), (email,)).fetchone()
+        if not user:
+            cur = conn.cursor()
+            cur.execute(query("INSERT INTO users (name,email,password_hash,role) VALUES (?,?,?,?) RETURNING id"),
+                        (name, email, generate_password_hash(os.urandom(32).hex()), role))
+            user_id = cur.fetchone()["id"] if USE_PG else cur.fetchone()[0]
+        else:
+            user_id = user["id"]
+    session.clear()
+    session["user_id"] = user_id
+    return jsonify(user={"id": user_id, "name": name, "email": email, "role": role}, presentation_mode=True)
+
+
 @app.post("/api/auth/logout")
 def auth_logout():
     session.clear()
