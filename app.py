@@ -449,6 +449,14 @@ def admin_summary():
                    top_areas=[dict(row) for row in areas])
 
 
+@app.get("/api/admin/users")
+@require_roles("admin")
+def admin_users():
+    with db() as conn:
+        rows = conn.execute("SELECT id,name,email,role,created_at FROM users ORDER BY created_at DESC, id DESC").fetchall()
+    return jsonify([dict(row) for row in rows])
+
+
 @app.post("/api/demo-payment")
 @require_roles("admin")
 def demo_payment():
