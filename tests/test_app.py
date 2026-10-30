@@ -222,3 +222,70 @@ def test_admin_csv_exports_are_forbidden_to_non_admin(client):
     farmroute.app.config.update(TESTING=False)
     assert client.get("/api/admin/export/products").status_code == 403
     farmroute.app.config.update(TESTING=True)
+
+
+def test_production_role_boundaries_and_order_privacy(client):
+    farmroute.app.config.update(TESTING=False)
+
+    farmer_one = client.post("/api/auth/register", json={
+        "name": "Farmer One", "email": "farmer-one@example.test",
+        "password": "StrongPass123", "role": "farmer"
+    })
+    assert farmer_one.status_code == 201
+    product = client.post("/api/products", json={
+        "farmer": "Farmer One Farm", "name": "Fresh Beans",
+        "category": "Vegetables", "price": 42, "stock": 30,
+        "unit": "kg", "area": "Central"
+    })
+    assert product.status_code == 201
+    product_id = product.json["id"]
+
+    client.post("/api/auth/logout")
+    farmer_two = client.post("/api/auth/register", json={
+        "name": "Farmer Two", "email": "farmer-two@example.test",
+        "password": "StrongPass123", "role": "farmer"
+    })
+    assert farmer_two.status_code == 201
+    assert client.patch(f"/api/products/{product_id}", json={"price": 50}).status_code == 403
+    assert client.delete(f"/api/products/{product_id}").status_code == 403
+
+    client.post("/api/auth/logout")
+    buyer_one = client.post("/api/auth/register", json={
+        "name": "Buyer One", "email": "buyer-one@example.test",
+        "password": "StrongPass123", "role": "buyer"
+    })
+    assert buyer_one.status_code == 201
+    order = client.post("/api/orders", json={
+        "product_id": product_id, "quantity": 2,
+        "buyer": "Buyer One Shop", "delivery_area": "Central",
+        "delivery_window": "Tomorrow morning"
+    })
+    assert order.status_code == 201
+    order_id = order.json["id"]
+    assert [o["id"] for o in client.get("/api/orders").json] == [order_id]
+    assert client.patch(f"/api/orders/{order_id}", json={"status": "Confirmed"}).status_code == 403
+    assert client.post("/api/products", json={
+        "farmer": "Buyer", "name": "Not allowed", "category": "Other",
+        "price": 10, "stock": 1, "unit": "kg", "area": "Central"
+    }).status_code == 403
+
+    client.post("/api/auth/logout")
+    client.post("/api/auth/register", json={
+        "name": "Buyer Two", "email": "buyer-two@example.test",
+        "password": "StrongPass123", "role": "buyer"
+    })
+    assert client.get("/api/orders").json == []
+
+    client.post("/api/auth/logout")
+    client.post("/api/auth/login", json={
+        "email": "Farmer Two@example.test", "password": "StrongPass123"
+    })
+    # Farmer two cannot update another farmer's order.
+    assert client.patch(f"/api/orders/{order_id}", json={"status": "Confirmed"}).status_code == 403
+
+    client.post("/api/auth/logout")
+    client.post("/api/auth/login", json={
+        "email": "farmer-one@example.test", "password": "StrongPass123"
+    })
+    assert client.patch(f"/api/orders/{order_id}", json={"status": "Confirmed"}).status_code == 200
+    farmroute.app.config.update(TESTING=True)
