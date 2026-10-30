@@ -247,7 +247,7 @@ def update_order(order_id):
 def batches():
     with db() as conn:
         rows = conn.execute("""SELECT delivery_area, delivery_window,
-            COUNT(*) AS order_count, SUM(quantity*price) AS order_value
+            COUNT(*) AS order_count, SUM(quantity*products.price) AS order_value
             FROM orders JOIN products ON products.id=orders.product_id
             WHERE status NOT IN ('Delivered','Cancelled')
             GROUP BY delivery_area,delivery_window
@@ -309,7 +309,7 @@ def admin_summary():
         orders_count = conn.execute("SELECT COUNT(*) AS n FROM orders").fetchone()["n"]
         active_count = conn.execute("SELECT COUNT(*) AS n FROM orders WHERE status NOT IN ('Delivered','Cancelled')").fetchone()["n"]
         delivered_count = conn.execute("SELECT COUNT(*) AS n FROM orders WHERE status='Delivered'").fetchone()["n"]
-        value = conn.execute("SELECT COALESCE(SUM(quantity*price),0) AS n FROM orders").fetchone()["n"]
+        value = conn.execute("SELECT COALESCE(SUM(orders.quantity*products.price),0) AS n FROM orders JOIN products ON products.id=orders.product_id").fetchone()["n"]
         areas = conn.execute("""SELECT delivery_area, COUNT(*) AS orders
             FROM orders GROUP BY delivery_area ORDER BY orders DESC LIMIT 5""").fetchall()
     return jsonify(products=products_count, orders=orders_count, active_orders=active_count,
