@@ -168,3 +168,28 @@ def test_registration_rejects_admin_role_and_weak_password(client):
         "password": "123", "role": "buyer"
     })
     assert weak.status_code == 400
+
+
+def test_role_permissions_are_enforced(client):
+    farmroute.app.config.update(TESTING=False)
+    unauth_orders = client.get("/api/orders")
+    assert unauth_orders.status_code == 401
+    unauth_product = client.post("/api/products", json={
+        "farmer": "A", "name": "Beans", "category": "Vegetables",
+        "price": 20, "stock": 10, "unit": "kg", "area": "Central"
+    })
+    assert unauth_product.status_code == 401
+
+    farmer = client.post("/api/auth/register", json={
+        "name": "Owner Farmer", "email": "owner@example.test",
+        "password": "StrongPass123", "role": "farmer"
+    })
+    assert farmer.status_code == 201
+    created = client.post("/api/products", json={
+        "farmer": "Owner Farmer", "name": "Beans", "category": "Vegetables",
+        "price": 20, "stock": 10, "unit": "kg", "area": "Central"
+    })
+    assert created.status_code == 201
+    assert client.get("/api/admin/summary").status_code == 403
+    assert client.get("/api/orders").status_code == 200
+    farmroute.app.config.update(TESTING=True)
