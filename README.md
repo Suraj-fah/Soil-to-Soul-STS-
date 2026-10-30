@@ -11,6 +11,9 @@ FarmRoute Direct is a professional farm-to-city marketplace and delivery-coordin
 - Persistent product and order records
 - Order status updates: Placed, Confirmed, Packed, Out for delivery, Delivered and Cancelled
 - Delivery batches grouped by area and delivery window
+- Stock reservation that prevents orders above available inventory
+- Order status transition checks and automatic stock restoration when an eligible order is cancelled
+- Automated API and workflow tests
 - Dashboard metrics for products, active orders, batches and listed stock value
 - Flask JSON API
 - SQLite for local development; PostgreSQL support through DATABASE_URL
@@ -40,7 +43,7 @@ The database is created automatically and seeded with fictional demonstration pr
 - `PATCH /api/orders/<id>` – update order status
 - `GET /api/delivery-batches` – group open orders by area and delivery window
 
-## Deploy to Render
+## Run tests\n\n```bash\npip install pytest\npytest -q\n```\n\nThe tests use temporary SQLite databases and do not modify your local demo database.\n\n## Deploy to Render
 
 A starter blueprint is included in `render.yaml`.
 
@@ -54,7 +57,7 @@ SQLite is intended for local development only on hosts with ephemeral filesystem
 
 ## Honest scope and limitations
 
-This is a hackathon MVP, not a production-ready marketplace. It currently has no real account authentication, role permissions, payment processing, live GPS, road-network route optimisation, SMS notifications or fully translated Telugu interface. The current order workflow uses a simple browser prompt for buyer details. Delivery batches are grouped by matching area and delivery window; they are not calculated driving routes.
+This is a hackathon MVP, not a production-ready marketplace. It currently has no real account authentication, role permissions, payment processing, live GPS, road-network route optimisation, SMS notifications or fully translated Telugu interface. The MVP does not yet support editing or deleting product listings, refunds, or multi-farmer settlement. The buyer order workflow uses an inline form for buyer, quantity, delivery area and preferred delivery window. Delivery batches are grouped by matching area and delivery window; they are not calculated driving routes.
 
 All seeded farms, names, products and orders are fictional examples. Listed-stock value is an arithmetic dashboard metric, not revenue. Do not claim verified transport savings or real farmer adoption from this demonstration.
 
