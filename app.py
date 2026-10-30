@@ -255,6 +255,82 @@ def batches():
         return jsonify([dict(row) for row in rows])
 
 
+
+@app.patch("/api/products/<int:product_id>")
+def edit_product(product_id):
+    data = request.get_json(silent=True) or {}
+    fields = {}
+    try:
+        for key, label, limit in [
+            ("farmer", "Farmer / farm name", 100), ("name", "Product name", 100),
+            ("category", "Category", 50), ("unit", "Unit", 20), ("area", "Pickup area", 100)
+        ]:
+            if key in data:
+                fields[key] = clean_text(data[key], label, limit)
+        if "price" in data:
+            fields["price"] = positive_number(data["price"], "Price")
+        if "stock" in data:
+            value = float(data["stock"])
+            if not math.isfinite(value) or value < 0:
+                raise ValueError("Stock must be zero or greater.")
+            fields["stock"] = value
+    except (ValueError, TypeError) as exc:
+        return jsonify(error=str(exc)), 400
+    if not fields:
+        return jsonify(error="No product fields supplied."), 400
+    with db() as conn:
+        cur = conn.cursor()
+        cur.execute(query("SELECT id FROM products WHERE id=?"), (product_id,))
+        if not cur.fetchone():
+            return jsonify(error="Product not found."), 404
+        assignments = ", ".join(f"{key}=?" for key in fields)
+        cur.execute(query(f"UPDATE products SET {assignments} WHERE id=?"),
+                    (*fields.values(), product_id))
+    return jsonify(message="Product updated.")
+
+
+@app.delete("/api/products/<int:product_id>")
+def delete_product(product_id):
+    with db() as conn:
+        cur = conn.cursor()
+        cur.execute(query("SELECT COUNT(*) AS n FROM orders WHERE product_id=? AND status NOT IN ('Delivered','Cancelled')"), (product_id,))
+        if cur.fetchone()["n"]:
+            return jsonify(error="This product has active orders and cannot be removed."), 409
+        cur.execute(query("DELETE FROM products WHERE id=?"), (product_id,))
+        if cur.rowcount == 0:
+            return jsonify(error="Product not found."), 404
+    return jsonify(message="Product removed.")
+
+
+@app.get("/api/admin/summary")
+def admin_summary():
+    with db() as conn:
+        products_count = conn.execute("SELECT COUNT(*) AS n FROM products").fetchone()["n"]
+        orders_count = conn.execute("SELECT COUNT(*) AS n FROM orders").fetchone()["n"]
+        active_count = conn.execute("SELECT COUNT(*) AS n FROM orders WHERE status NOT IN ('Delivered','Cancelled')").fetchone()["n"]
+        delivered_count = conn.execute("SELECT COUNT(*) AS n FROM orders WHERE status='Delivered'").fetchone()["n"]
+        value = conn.execute("SELECT COALESCE(SUM(quantity*price),0) AS n FROM orders").fetchone()["n"]
+        areas = conn.execute("""SELECT delivery_area, COUNT(*) AS orders
+            FROM orders GROUP BY delivery_area ORDER BY orders DESC LIMIT 5""").fetchall()
+    return jsonify(products=products_count, orders=orders_count, active_orders=active_count,
+                   delivered_orders=delivered_count, order_value=float(value),
+                   top_areas=[dict(row) for row in areas])
+
+
+@app.post("/api/demo-payment")
+def demo_payment():
+    data = request.get_json(silent=True) or {}
+    try:
+        amount = positive_number(data.get("amount"), "Payment amount")
+        method = clean_text(data.get("method", "Demo checkout"), "Payment method", 40)
+    except ValueError as exc:
+        return jsonify(error=str(exc)), 400
+    # This endpoint intentionally simulates payment; it never charges a real account.
+    return jsonify(payment_id=f"DEMO-{os.urandom(4).hex().upper()}",
+                   amount=amount, method=method, status="Demo payment successful",
+                   note="Simulation only. No money was collected."), 200
+
+
 @app.errorhandler(404)
 def not_found(_error):
     if request.path.startswith("/api/"):
