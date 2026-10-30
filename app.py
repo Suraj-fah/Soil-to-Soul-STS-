@@ -80,6 +80,17 @@ def init_db():
             status TEXT NOT NULL DEFAULT 'Placed',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )""")
+        # Add ownership columns to databases created before account support.
+        if USE_PG:
+            for table, column in (("products", "farmer_user_id"), ("orders", "buyer_user_id")):
+                cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name=? AND column_name=?", (table, column))
+                if not cur.fetchone():
+                    cur.execute(f"ALTER TABLE {table} ADD COLUMN {column} INTEGER REFERENCES users(id)")
+        else:
+            for table, column in (("products", "farmer_user_id"), ("orders", "buyer_user_id")):
+                cur.execute(f"PRAGMA table_info({table})")
+                if column not in [row["name"] for row in cur.fetchall()]:
+                    cur.execute(f"ALTER TABLE {table} ADD COLUMN {column} INTEGER REFERENCES users(id)")
         cur.execute("SELECT COUNT(*) AS n FROM products")
         if cur.fetchone()["n"] == 0:
             samples = [
