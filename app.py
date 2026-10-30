@@ -8,7 +8,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask import Flask, jsonify, render_template, request, session
 
 app = Flask(__name__)
-app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "local-demo-change-this")
+app.config.update(SECRET_KEY=os.getenv("SECRET_KEY", "local-development-only-change-me"), SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax", SESSION_COOKIE_SECURE=os.getenv("COOKIE_SECURE", "false").lower() == "true")
 DB_URL = os.getenv("DATABASE_URL", "").replace("postgres://", "postgresql://", 1)
 USE_PG = DB_URL.startswith("postgresql://")
 
@@ -222,8 +222,8 @@ def products():
         return jsonify([dict(row) for row in rows])
 
 
-@require_roles("farmer","admin")
 @app.post("/api/products")
+@require_roles("farmer","admin")
 def add_product():
     data = request.get_json(silent=True) or {}
     try:
@@ -241,9 +241,9 @@ def add_product():
         cur = conn.cursor()
         cur.execute(
             query("""INSERT INTO products
-            (farmer,name,category,price,stock,unit,area)
-            VALUES (?,?,?,?,?,?,?) RETURNING id"""),
-            (farmer, name, category, price, stock, unit, area),
+            (farmer,name,category,price,stock,unit,area,farmer_user_id)
+            VALUES (?,?,?,?,?,?,?,?) RETURNING id"""),
+            (farmer, name, category, price, stock, unit, area, current_user()["id"] if current_user() else None),
         )
         product_id = cur.fetchone()["id"] if USE_PG else cur.fetchone()[0]
     return jsonify(id=product_id, message="Product added successfully."), 201
@@ -259,8 +259,8 @@ def orders():
         return jsonify([dict(row) for row in rows])
 
 
-@require_roles("buyer","admin")
 @app.post("/api/orders")
+@require_roles("buyer","admin")
 def add_order():
     data = request.get_json(silent=True) or {}
     try:
@@ -293,16 +293,16 @@ def add_order():
 
         cur.execute(
             query("""INSERT INTO orders
-            (buyer,product_id,quantity,delivery_area,delivery_window,status)
-            VALUES (?,?,?,?,?,?) RETURNING id"""),
-            (buyer, product_id, quantity, area, window, "Placed"),
+            (buyer,product_id,quantity,delivery_area,delivery_window,status,buyer_user_id)
+            VALUES (?,?,?,?,?,?,?) RETURNING id"""),
+            (buyer, product_id, quantity, area, window, "Placed", current_user()["id"] if current_user() else None),
         )
         order_id = cur.fetchone()["id"] if USE_PG else cur.fetchone()[0]
     return jsonify(id=order_id, message="Order placed and saved."), 201
 
 
-@require_roles("farmer","admin")
 @app.patch("/api/orders/<int:order_id>")
+@require_roles("farmer","admin")
 def update_order(order_id):
     data = request.get_json(silent=True) or {}
     new_status = data.get("status")
@@ -345,8 +345,8 @@ def batches():
 
 
 
-@require_roles("farmer","admin")
 @app.patch("/api/products/<int:product_id>")
+@require_roles("farmer","admin")
 def edit_product(product_id):
     data = request.get_json(silent=True) or {}
     fields = {}
@@ -379,8 +379,8 @@ def edit_product(product_id):
     return jsonify(message="Product updated.")
 
 
-@require_roles("farmer","admin")
 @app.delete("/api/products/<int:product_id>")
+@require_roles("farmer","admin")
 def delete_product(product_id):
     with db() as conn:
         cur = conn.cursor()
@@ -396,8 +396,8 @@ def delete_product(product_id):
     return jsonify(message="Product removed.")
 
 
-@require_roles("admin")
 @app.get("/api/admin/summary")
+@require_roles("admin")
 def admin_summary():
     with db() as conn:
         products_count = conn.execute("SELECT COUNT(*) AS n FROM products").fetchone()["n"]
@@ -412,8 +412,8 @@ def admin_summary():
                    top_areas=[dict(row) for row in areas])
 
 
-@require_roles("admin")
 @app.post("/api/demo-payment")
+@require_roles("admin")
 def demo_payment():
     data = request.get_json(silent=True) or {}
     try:
