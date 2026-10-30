@@ -278,7 +278,7 @@ def test_production_role_boundaries_and_order_privacy(client):
 
     client.post("/api/auth/logout")
     client.post("/api/auth/login", json={
-        "email": "Farmer Two@example.test", "password": "StrongPass123"
+        "email": "farmer-two@example.test", "password": "StrongPass123"
     })
     # Farmer two cannot update another farmer's order.
     assert client.patch(f"/api/orders/{order_id}", json={"status": "Confirmed"}).status_code == 403
