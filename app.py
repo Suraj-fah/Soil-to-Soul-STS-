@@ -327,6 +327,12 @@ def update_order(order_id):
         if not order:
             return jsonify(error="Order not found."), 404
 
+        user = current_user()
+        if user and user["role"] == "farmer":
+            owner = conn.execute(query("SELECT farmer_user_id FROM products WHERE id=?"), (order["product_id"],)).fetchone()
+            if not owner or owner["farmer_user_id"] != user["id"]:
+                return jsonify(error="You can only update orders for your own products."), 403
+
         old_status = order["status"]
         if new_status == old_status:
             return jsonify(message="Order status is unchanged.")
@@ -381,9 +387,13 @@ def edit_product(product_id):
         return jsonify(error="No product fields supplied."), 400
     with db() as conn:
         cur = conn.cursor()
-        cur.execute(query("SELECT id FROM products WHERE id=?"), (product_id,))
-        if not cur.fetchone():
+        cur.execute(query("SELECT id,farmer_user_id FROM products WHERE id=?"), (product_id,))
+        existing = cur.fetchone()
+        if not existing:
             return jsonify(error="Product not found."), 404
+        user = current_user()
+        if user and user["role"] == "farmer" and existing["farmer_user_id"] != user["id"]:
+            return jsonify(error="You can only edit your own product listings."), 403
         assignments = ", ".join(f"{key}=?" for key in fields)
         cur.execute(query(f"UPDATE products SET {assignments} WHERE id=?"),
                     (*fields.values(), product_id))
@@ -395,9 +405,13 @@ def edit_product(product_id):
 def delete_product(product_id):
     with db() as conn:
         cur = conn.cursor()
-        cur.execute(query("SELECT COUNT(*) AS n FROM products WHERE id=?"), (product_id,))
-        if cur.fetchone()["n"] == 0:
+        cur.execute(query("SELECT id,farmer_user_id FROM products WHERE id=?"), (product_id,))
+        existing = cur.fetchone()
+        if not existing:
             return jsonify(error="Product not found."), 404
+        user = current_user()
+        if user and user["role"] == "farmer" and existing["farmer_user_id"] != user["id"]:
+            return jsonify(error="You can only remove your own product listings."), 403
         # Keep order history referentially intact. A product with any historical
         # order cannot be hard-deleted; farmers can set its stock to zero instead.
         cur.execute(query("SELECT COUNT(*) AS n FROM orders WHERE product_id=?"), (product_id,))
