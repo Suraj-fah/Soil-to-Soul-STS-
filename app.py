@@ -158,12 +158,12 @@ def auth_register():
         return jsonify(error=str(exc)), 400
     with db() as conn:
         cur = conn.cursor()
-        try:
-            cur.execute(query("INSERT INTO users (name,email,password_hash,role) VALUES (?,?,?,?) RETURNING id"),
-                        (name, email, generate_password_hash(password), role))
-            user_id = cur.fetchone()["id"] if USE_PG else cur.fetchone()[0]
-        except Exception:
+        cur.execute(query("INSERT INTO users (name,email,password_hash,role) VALUES (?,?,?,?) ON CONFLICT(email) DO NOTHING RETURNING id"),
+                    (name, email, generate_password_hash(password), role))
+        created = cur.fetchone()
+        if not created:
             return jsonify(error="An account with this email may already exist."), 409
+        user_id = created["id"] if USE_PG else created[0]
     session.clear()
     session["user_id"] = user_id
     return jsonify(user={"id": user_id, "name": name, "email": email, "role": role}), 201
