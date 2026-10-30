@@ -17,7 +17,7 @@ FarmRoute Direct is a professional farm-to-city marketplace and delivery-coordin
 - Delivery batches grouped by area and delivery window
 - Stock reservation that prevents orders above available inventory
 - Order status transition checks and automatic stock restoration when an eligible order is cancelled
-- Automated API and workflow tests
+- Automated API and workflow tests, including administrator CSV export access checks
 - Dashboard metrics for products, active orders, batches and listed stock value
 - Flask JSON API
 - SQLite for local development; PostgreSQL support through DATABASE_URL
@@ -52,6 +52,7 @@ The database is created automatically and seeded with fictional demonstration pr
 - `PATCH /api/orders/<id>` – update order status
 - `GET /api/delivery-batches` – group open orders by area and delivery window
 - `GET /api/admin/summary` and `GET /api/admin/users` – administrator-only summary and account directory
+- `GET /api/admin/export/products`, `/orders` and `/users` – administrator-only CSV exports for backup and spreadsheet review
 - `POST /api/demo-payment` – simulated checkout only; no money is collected
 
 ## Run tests
