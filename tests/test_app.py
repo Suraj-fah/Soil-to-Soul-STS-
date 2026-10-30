@@ -129,3 +129,42 @@ def test_product_with_order_history_cannot_be_deleted(client):
     response = client.delete(f"/api/products/{product['id']}")
     assert response.status_code == 409
     assert "order history" in response.json["error"]
+
+
+def test_farmer_and_buyer_registration_and_login(client):
+    farmer = client.post("/api/auth/register", json={
+        "name": "Test Farmer", "email": "farmer@example.test",
+        "password": "StrongPass123", "role": "farmer"
+    })
+    assert farmer.status_code == 201
+    assert farmer.json["user"]["role"] == "farmer"
+    assert "password" not in farmer.json["user"]
+
+    client.post("/api/auth/logout")
+    buyer = client.post("/api/auth/register", json={
+        "name": "Test Buyer", "email": "buyer@example.test",
+        "password": "StrongPass123", "role": "buyer"
+    })
+    assert buyer.status_code == 201
+    assert buyer.json["user"]["role"] == "buyer"
+
+    client.post("/api/auth/logout")
+    login = client.post("/api/auth/login", json={
+        "email": "farmer@example.test", "password": "StrongPass123"
+    })
+    assert login.status_code == 200
+    assert login.json["user"]["role"] == "farmer"
+    assert client.get("/api/auth/me").json["user"]["email"] == "farmer@example.test"
+
+
+def test_registration_rejects_admin_role_and_weak_password(client):
+    admin = client.post("/api/auth/register", json={
+        "name": "Fake Admin", "email": "admin@example.test",
+        "password": "StrongPass123", "role": "admin"
+    })
+    assert admin.status_code == 400
+    weak = client.post("/api/auth/register", json={
+        "name": "Buyer", "email": "weak@example.test",
+        "password": "123", "role": "buyer"
+    })
+    assert weak.status_code == 400
